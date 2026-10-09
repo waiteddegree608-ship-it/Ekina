@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "research-core",
+  "name": "Ekina Research Core",
+  "version": "0.1.0",
+  "kind": "builtin-capability-pack",
+  "runtimePack": "research",
+  "implementation": "ekina-application/src/main/java/com/ekina/application/agentreg/CapabilityPackCatalog.java",
+  "skills": ["skills/research-planning", "skills/literature-review", "skills/paper-pipeline", "skills/research-audit"],
+  "description": "课题、证据、文献与实验工作流；算力和外部写入遵循后端权限。"
+}

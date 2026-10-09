@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "research-connector",
+  "name": "Ekina Research Connector",
+  "version": "0.1.0",
+  "kind": "mcp-server",
+  "implementation": "mcps/research/src/server.mjs",
+  "skills": [],
+  "transport": "stdio",
+  "readOnly": true,
+  "description": "从外部 MCP 客户端查询 Ekina 项目、综述、论文与能力。"
+}

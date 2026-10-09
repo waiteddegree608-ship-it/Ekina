@@ -1,0 +1,19 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ekina
+      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:-ekina}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set database password in .env}
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - ekina-db:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/001-vector.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d ekina"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+volumes:
+  ekina-db:

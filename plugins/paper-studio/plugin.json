@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "paper-studio",
+  "name": "Ekina Paper Studio",
+  "version": "0.1.0",
+  "kind": "builtin-capability-pack",
+  "runtimePack": "typesetting",
+  "implementation": "ekina-application/src/main/java/com/ekina/application/agentreg/CapabilityPackCatalog.java",
+  "skills": ["skills/paper-writing", "skills/paper-typesetting", "skills/research-audit"],
+  "description": "基于证据的学术写作、LaTeX 编译、图表和交付审查。"
+}

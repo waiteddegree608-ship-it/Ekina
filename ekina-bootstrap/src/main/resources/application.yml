@@ -1,0 +1,265 @@
+server:
+  port: 8081
+  address: ${EKINA_BIND_ADDRESS:127.0.0.1}
+
+# File logging so detached backend (no console redirect) still leaves traces.
+# Without this, "silent" exits are hard to diagnose; and redirecting stdout from
+# Start-Process keeps Java inside the parent Job Object → dies when parent exits.
+logging:
+  file:
+    name: ${EKINA_LOG_FILE:./backend-run.log}
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 5
+  level:
+    root: INFO
+
+spring:
+  application:
+    name: ekina-platform
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  
+  profiles:
+    active: dev
+
+  # Database configuration (PostgreSQL with PGvector extension)
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ekina}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+
+  # OpenCode Zen — OpenAI-compatible gateway
+  # Docs: https://opencode.ai/docs/zen/
+  # Primary base (user): https://opencode.ai/zen/go/v1
+  # Env: OPENCODE_API_KEY, OPENCODE_BASE_URL, OPENCODE_CHAT_MODEL
+  ai:
+    openai:
+      api-key: ${OPENCODE_API_KEY:${SILICON_FLOW_API_KEY:}}
+      base-url: ${OPENCODE_BASE_URL:https://opencode.ai/zen/go/v1}
+      chat:
+        options:
+          # OpenAI-compatible Zen models (examples):
+          # kimi-k2.7-code, kimi-k2.6, glm-5.3, deepseek-v4-pro, grok-4.5, qwen3.8-max
+          # Daily CHIEF: deepseek-v4-pro (reasoning, still enough quota for ReAct).
+          # Coding hand: EKINA_OPENCODE_MODEL=opencode-go/kimi-k2.7-code
+          # Research critic: EKINA_RESEARCH_MODEL=glm-5.3 (idea/claim review, low volume)
+          model: ${OPENCODE_CHAT_MODEL:deepseek-v4-pro}
+          temperature: 0.7
+      embedding:
+        options:
+          # Only used when ekina.embedding.provider=openai
+          model: ${OPENCODE_EMBEDDING_MODEL:text-embedding-3-small}
+
+# Knife4j API Documentation configurations
+knife4j:
+  enable: true
+  setting:
+    enable-swagger-models: true
+    enable-document-manage: true
+    enable-version: true
+
+# Custom configurations for the Ekina Platform (e.g. LangChain4j, wxbot, MCP)
+ekina:
+  workspace-dir: ${EKINA_WORKSPACE_DIR:.}
+  sandbox-dir: ${EKINA_SANDBOX_DIR:./sandbox}
+  # Default compute SSH host (SmartML / GPU box) — auto-granted as ssh_remote; password via EKINA_SSH_PASSWORD
+  compute:
+    ssh:
+      host: ${EKINA_COMPUTE_SSH_HOST:}
+      port: ${EKINA_COMPUTE_SSH_PORT:0}
+      user: ${EKINA_COMPUTE_SSH_USER:}
+  cfgpu:
+    api-token: ${CFGPU_API_TOKEN:}
+    api-base: ${CFGPU_API_BASE:https://api.cfgpu.com}
+  github:
+    token: ${EKINA_GITHUB_TOKEN:}
+    user: ${EKINA_GITHUB_USER:}
+    lab-repo: ${EKINA_LAB_REPO:ekina-lab}
+  overleaf:
+    git-url: ${EKINA_OVERLEAF_GIT_URL:}
+    token: ${EKINA_OVERLEAF_TOKEN:}
+  llm:
+    # auto | openai | messages  — Claude* auto-routes to /messages + x-api-key
+    protocol: ${EKINA_LLM_PROTOCOL:auto}
+    # extra model ids forced onto Anthropic /messages (comma-separated)
+    messages-models: ${EKINA_LLM_MESSAGES_MODELS:}
+    # deepseek | opencode | auto  — official DeepSeek vs OpenCode Zen
+    chief-provider: ${EKINA_CHIEF_PROVIDER:opencode}
+    research-provider: ${EKINA_RESEARCH_PROVIDER:opencode}
+    # OpenCode-side critic model (used as fallback when DeepSeek is down)
+    research-model: ${EKINA_RESEARCH_MODEL:glm-5.3}
+    # Official DeepSeek peak = UTC 01-04 and 06-10 Mon-Fri (Beijing 09-12 / 14-18). Skip DeepSeek then.
+    skip-deepseek-peak: ${EKINA_SKIP_DEEPSEEK_PEAK:false}
+    peak-alt-model: ${EKINA_PEAK_ALT_MODEL:glm-5.3}
+  deepseek:
+    api-key: ${DEEPSEEK_API_KEY:}
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    chat-model: ${DEEPSEEK_CHAT_MODEL:deepseek-v4-flash}
+    reasoner-model: ${DEEPSEEK_REASONER_MODEL:deepseek-v4-pro}
+  skills:
+    enabled: true
+  reminders:
+    enabled: true
+    default-user: user-1
+    poll-ms: 30000
+  # Agent "home" disk (soft quota). Default path next to sandbox.
+  agent-home: ${EKINA_AGENT_HOME:./AgentHome}
+  # PC-assistant (代理人) extra folder allowlist, semicolon/comma separated absolute paths
+  agent:
+    allowed-roots: ${EKINA_AGENT_ALLOWED_ROOTS:}
+    # IDE-agent style execution mode: PLAN (propose-first) | NORMAL (default) | TURBO (more autonomous)
+    mode: ${EKINA_AGENT_MODE:NORMAL}
+  home:
+    quota-gb: ${EKINA_HOME_QUOTA_GB:30}
+    warn-ratio: 0.70
+    critical-ratio: 0.90
+    scan-ms: 600000
+  life:
+    enabled: ${EKINA_LIFE_ENABLED:false}
+    idle-bilibili: ${EKINA_LIFE_IDLE_BILIBILI:false}
+    interests: ${EKINA_LIFE_INTERESTS:AI,LoRA,编程,机器学习}
+    heartbeat-ms: 1200000
+    notify-user: false
+  reviews:
+    # Independent requests share two worker slots; phases inside each campaign remain ordered.
+    max-concurrent-campaigns: ${EKINA_REVIEWS_MAX_CONCURRENT_CAMPAIGNS:2}
+  # Three-agent crew: CHIEF (Ekina) + CODER (OpenCode) + CLAW (OpenClaw)
+  multiagent:
+    enabled: true
+    poll-ms: 5000
+    # Shared OpenCode Zen key: local concurrency + spacing (provider may still 429)
+    api-max-concurrent: ${EKINA_API_MAX_CONCURRENT:2}
+    api-min-interval-ms: ${EKINA_API_MIN_INTERVAL_MS:800}
+    opencode:
+      enabled: true
+      # Bundled under vendors/ (see scripts/install-agents.ps1) — no separate global install required
+      command: ${EKINA_OPENCODE_CMD:opencode}
+      args-template: ${EKINA_OPENCODE_ARGS:}
+      # 0 = no Ekina wall-clock kill; wait for OpenCode CLI to exit. Set >0 only as emergency cap.
+      timeout-sec: ${EKINA_OPENCODE_TIMEOUT_SEC:0}
+      workdir: ${EKINA_OPENCODE_WORKDIR:./sandbox/opencode-jobs}
+      # OpenCode Go model (provider prefix required). Coding hand: kimi-k2.7-code
+      model: ${EKINA_OPENCODE_MODEL:opencode-go/kimi-k2.7-code}
+    openclaw:
+      enabled: ${EKINA_OPENCLAW_ENABLED:false}
+      command: ${EKINA_OPENCLAW_CMD:openclaw}
+      webhook-url: ${EKINA_OPENCLAW_WEBHOOK:}
+      timeout-sec: 120
+  # Paper factory (lit + innov menu + A100 sweep + LaTeX + citation gate)
+  paper:
+    enabled: ${EKINA_PAPER_ENABLED:true}
+    poll-ms: 15000
+    lit-limit: ${EKINA_PAPER_LIT_LIMIT:12}
+    min-year: ${EKINA_PAPER_MIN_YEAR:0}
+    # smoke | reproduce | research
+    mode: ${EKINA_PAPER_MODE:research}
+    read-top-n: ${EKINA_PAPER_READ_TOP_N:3}
+    baseline:
+      enabled: ${EKINA_PAPER_BASELINE_ENABLED:true}
+      timeout-sec: ${EKINA_PAPER_BASELINE_TIMEOUT:90}
+    semanticscholar-api-key: ${S2_API_KEY:}
+    sweep:
+      # auto: use SSH when ssh_remote granted; else prepare scripts only (no fake metrics)
+      mode: ${EKINA_PAPER_SWEEP_MODE:auto}
+      remote-root: ${EKINA_PAPER_REMOTE_ROOT:/root/ekina-sweeps}
+      ssh-timeout-sec: ${EKINA_PAPER_SWEEP_TIMEOUT:180}
+      async: ${EKINA_PAPER_SWEEP_ASYNC:true}
+      poll-sec: ${EKINA_PAPER_SWEEP_POLL:20}
+      max-wait-sec: ${EKINA_PAPER_SWEEP_MAX_WAIT:2400}
+      epochs: ${EKINA_PAPER_SWEEP_EPOCHS:2}
+      # synthetic = fast A100 path; cifar10 = real download (slow on constrained egress)
+      dataset: ${EKINA_PAPER_SWEEP_DATASET:synthetic}
+    scout:
+      enabled: ${EKINA_PAPER_SCOUT_ENABLED:false}
+      interval-ms: ${EKINA_PAPER_SCOUT_INTERVAL_MS:3600000}
+      max-per-day: ${EKINA_PAPER_SCOUT_MAX_DAY:2}
+      domains: ${EKINA_PAPER_SCOUT_DOMAINS:LoRA diffusion,vision transformer fine-tuning,graph neural network robustness}
+    mlflow:
+      # Self-hosted MLflow tracking server (Apache-2.0). Empty = tracking disabled (no-op).
+      tracking-url: ${EKINA_MLFLOW_TRACKING_URL:}
+      experiment: ${EKINA_MLFLOW_EXPERIMENT:ekina-paper}
+    gate:
+      min-lit: ${EKINA_PAPER_MIN_LIT:5}
+      require-cite-ok: true
+      require-zip: true
+      require-metrics-for-claims: true
+  # She lives on the PC: self-directed ticks (not owner task decomposition)
+  autonomy:
+    enabled-default: false
+    # how often she "wakes up" to do something of her own (default 3 min)
+    tick-ms: ${EKINA_AUTONOMY_TICK_MS:180000}
+    max-ticks-per-day: ${EKINA_AUTONOMY_MAX_TICKS:0}
+    # false = quiet; never auto-post every tick
+    notify-each-tick: ${EKINA_AUTONOMY_NOTIFY_EACH:false}
+    # 0 = never force reports by cadence; only when tick outcome is substantial
+    surprise-every-n-ticks: ${EKINA_AUTONOMY_SURPRISE_N:0}
+    vault-path: ${EKINA_VAULT_PATH:./AgentHome/notes}
+  observer:
+    enabled: false
+    default-user: user-1
+    blacklist: 1Password,KeePass,Bank,密码,钱包,微信
+  notify:
+    enabled: false
+    # Actionable permission/plan popups (Windows modal Yes/No). true = popup asks + auto-decides on click.
+    permission-dialog: ${EKINA_NOTIFY_PERMISSION_DIALOG:false}
+    # Base URL the popup uses to POST its decision back to the backend.
+    callback-base: ${EKINA_NOTIFY_CALLBACK_BASE:http://127.0.0.1:8081}
+  jobs:
+    ssh:
+      enabled: true
+      timeout-sec: 120
+      # Password auth (SmartML etc.). Prefer env, never commit real secrets.
+      # EKINA_SSH_PASSWORD=... in .env  OR  set below via env substitution only.
+      password: ${EKINA_SSH_PASSWORD:}
+      # Optional default private key if scope.keyPath omitted
+      default-key-path: ${EKINA_SSH_KEY_PATH:}
+  embedding:
+    # local = deterministic hash embedding (no remote call)
+    # openai = call spring.ai.openai embedding endpoint
+    provider: ${EKINA_EMBEDDING_PROVIDER:local}
+    dimensions: 1024
+  # Optional external MCP clients; configure only the servers you install.
+  mcp:
+    servers: []
+  wxbot:
+    enabled: false
+    token: ${WXBOT_TOKEN:}
+    api-url: ${WXBOT_API_URL:}
+  sandbox:
+    serverless-url: ${SANDBOX_SERVERLESS_URL:}
+  # Multimodal video watching (L1 subtitles + L2 ASR + L3 keyframe vision)
+  video:
+    ytdlp-path: ${EKINA_YTDLP_PATH:yt-dlp}
+    ffmpeg-path: ${EKINA_FFMPEG_PATH:ffmpeg}
+    ffprobe-path: ${EKINA_FFPROBE_PATH:ffprobe}
+    max-process-seconds: 2400
+    max-frames: 8
+    frame-interval-seconds: 25
+    # Prefer a Zen chat/completions model that accepts image_url if available
+    vision-model: ${OPENCODE_VISION_MODEL:${EKINA_VISION_MODEL:grok-4.5}}
+    # ASR: Zen has no speech endpoint — leave empty to skip L2, or point to OpenAI-compatible /audio/transcriptions
+    asr-model: ${EKINA_ASR_MODEL:whisper-1}
+    asr-base-url: ${EKINA_ASR_BASE_URL:}
+    max-transcript-chars: 12000
+    max-vision-chars-per-frame: 280
+    keep-raw-media: false
+    max-video-height: 480
+    process-timeout-seconds: 600
